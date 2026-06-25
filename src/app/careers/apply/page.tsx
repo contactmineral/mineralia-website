@@ -3,24 +3,71 @@
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Upload, Linkedin, CheckCircle } from "lucide-react";
+import { ArrowLeft, FileText, Linkedin, CheckCircle, ExternalLink } from "lucide-react";
 
 function ApplicationForm() {
   const searchParams = useSearchParams();
   const roleSlug = searchParams.get("role");
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSubmittingSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [resumeUrlError, setResumeUrlError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const validateDriveUrl = (url: string) => {
+    if (!url) return "Resume link is required.";
+    try {
+      const parsed = new URL(url);
+      if (parsed.hostname !== "drive.google.com") {
+        return "Please enter a valid Google Drive URL (drive.google.com).";
+      }
+    } catch {
+      return "Please enter a valid URL.";
+    }
+    return null;
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setErrorMsg(null);
+
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    // Validate Google Drive URL before submitting
+    const urlErr = validateDriveUrl(formData.get("resumeUrl") as string);
+    if (urlErr) {
+      setResumeUrlError(urlErr);
+      return;
+    }
+
     setIsSubmitting(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setIsSubmitting(false);
-    setIsSubmittingSuccess(true);
+
+    try {
+      const res = await fetch("/api/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.get("name"),
+          email: formData.get("email"),
+          phone: formData.get("phone"),
+          linkedin: formData.get("linkedin"),
+          resumeUrl: formData.get("resumeUrl"),
+          coverLetter: formData.get("coverLetter"),
+          role: roleSlug ?? undefined,
+        }),
+      });
+
+      if (res.ok) {
+        setIsSubmittingSuccess(true);
+      } else {
+        setErrorMsg("Failed to submit your application. Please try again.");
+      }
+    } catch {
+      setErrorMsg("Network error. Please check your connection and try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isSuccess) {
@@ -53,46 +100,68 @@ function ApplicationForm() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Full Name *</label>
-            <input required type="text" className="w-full px-4 py-3 rounded border border-slate-300 focus:ring-2 focus:ring-mineralia-teal focus:border-transparent outline-none transition-all" placeholder="Jane Doe" />
+            <input required name="name" type="text" className="w-full px-4 py-3 rounded border border-slate-300 focus:ring-2 focus:ring-mineralia-teal focus:border-transparent outline-none transition-all" placeholder="Jane Doe" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Email Address *</label>
-            <input required type="email" className="w-full px-4 py-3 rounded border border-slate-300 focus:ring-2 focus:ring-mineralia-teal focus:border-transparent outline-none transition-all" placeholder="jane@example.com" />
+            <input required name="email" type="email" className="w-full px-4 py-3 rounded border border-slate-300 focus:ring-2 focus:ring-mineralia-teal focus:border-transparent outline-none transition-all" placeholder="jane@example.com" />
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number *</label>
-            <input required type="tel" className="w-full px-4 py-3 rounded border border-slate-300 focus:ring-2 focus:ring-mineralia-teal focus:border-transparent outline-none transition-all" placeholder="+1 (555) 000-0000" />
+            <input required name="phone" type="tel" className="w-full px-4 py-3 rounded border border-slate-300 focus:ring-2 focus:ring-mineralia-teal focus:border-transparent outline-none transition-all" placeholder="+1 (555) 000-0000" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">LinkedIn Profile</label>
             <div className="relative">
               <Linkedin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input type="url" className="w-full pl-10 pr-4 py-3 rounded border border-slate-300 focus:ring-2 focus:ring-mineralia-teal focus:border-transparent outline-none transition-all" placeholder="https://linkedin.com/in/..." />
+              <input name="linkedin" type="url" className="w-full pl-10 pr-4 py-3 rounded border border-slate-300 focus:ring-2 focus:ring-mineralia-teal focus:border-transparent outline-none transition-all" placeholder="https://linkedin.com/in/..." />
             </div>
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Resume / CV *</label>
-          <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:bg-slate-50 transition-colors cursor-pointer">
-            <Upload className="mx-auto text-slate-400 mb-3" size={32} />
-            <p className="text-sm text-slate-600 font-medium">Click to upload or drag and drop</p>
-            <p className="text-xs text-slate-400 mt-1">PDF, DOCX up to 10MB</p>
-            <input type="file" className="hidden" accept=".pdf,.doc,.docx" />
+          <label htmlFor="resumeUrl" className="block text-sm font-medium text-slate-700 mb-1">
+            Resume / CV — Google Drive Link *
+          </label>
+          <p className="text-xs text-slate-400 mb-2">
+            Share your resume as a Google Drive file with &ldquo;Anyone with the link&rdquo; viewer access, then paste the link below.
+          </p>
+          <div className="relative">
+            <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input
+              id="resumeUrl"
+              name="resumeUrl"
+              type="url"
+              required
+              placeholder="https://drive.google.com/file/d/..."
+              onChange={() => setResumeUrlError(null)}
+              onBlur={(e) => setResumeUrlError(validateDriveUrl(e.target.value))}
+              className={`w-full pl-10 pr-10 py-3 rounded border focus:ring-2 focus:ring-mineralia-teal focus:border-transparent outline-none transition-all ${
+                resumeUrlError ? "border-red-400 bg-red-50" : "border-slate-300"
+              }`}
+            />
+            <ExternalLink className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={16} />
           </div>
+          {resumeUrlError && (
+            <p className="text-red-500 text-xs mt-1.5">{resumeUrlError}</p>
+          )}
         </div>
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Cover Letter</label>
-          <textarea rows={5} className="w-full px-4 py-3 rounded border border-slate-300 focus:ring-2 focus:ring-mineralia-teal focus:border-transparent outline-none transition-all" placeholder="Tell us why you're a great fit..."></textarea>
+          <textarea name="coverLetter" rows={5} className="w-full px-4 py-3 rounded border border-slate-300 focus:ring-2 focus:ring-mineralia-teal focus:border-transparent outline-none transition-all" placeholder="Tell us why you're a great fit..."></textarea>
         </div>
 
+        {errorMsg && (
+          <p className="text-red-500 text-sm">{errorMsg}</p>
+        )}
+
         <div className="pt-4">
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={isSubmitting}
             className="w-full bg-mineralia-teal hover:bg-mineralia-teal-hover text-white py-4 rounded font-bold text-lg transition-colors shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
           >

@@ -12,11 +12,38 @@ const jpMinerals = allMinerals.filter(m =>
 
 export default function JapaneseMarketPage() {
   const [formStatus, setFormStatus] = useState<"idle" | "submitting" | "success">("idle");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormStatus("submitting");
-    setTimeout(() => setFormStatus("success"), 1500);
+    setErrorMsg(null);
+
+    const formData = new FormData(e.currentTarget);
+
+    try {
+      const res = await fetch("/api/japan-inquiry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company: formData.get("company"),
+          contactName: formData.get("contactName"),
+          email: formData.get("email"),
+          mineral: formData.get("mineral"),
+          requirements: formData.get("requirements"),
+        }),
+      });
+
+      if (res.ok) {
+        setFormStatus("success");
+      } else {
+        setFormStatus("idle");
+        setErrorMsg("Failed to send inquiry. Please try again.");
+      }
+    } catch {
+      setFormStatus("idle");
+      setErrorMsg("Network error. Please check your connection and try again.");
+    }
   };
 
   return (
@@ -160,19 +187,19 @@ export default function JapaneseMarketPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Company Name (会社名)</label>
-                    <input required type="text" className="w-full bg-transparent border-b border-slate-600 focus:border-accent-terra focus:outline-none py-2 text-white transition-colors" />
+                    <input required name="company" type="text" className="w-full bg-transparent border-b border-slate-600 focus:border-accent-terra focus:outline-none py-2 text-white transition-colors" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Contact Name (担当者名)</label>
-                    <input required type="text" className="w-full bg-transparent border-b border-slate-600 focus:border-accent-terra focus:outline-none py-2 text-white transition-colors" />
+                    <input required name="contactName" type="text" className="w-full bg-transparent border-b border-slate-600 focus:border-accent-terra focus:outline-none py-2 text-white transition-colors" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Email (メールアドレス)</label>
-                    <input required type="email" className="w-full bg-transparent border-b border-slate-600 focus:border-accent-terra focus:outline-none py-2 text-white transition-colors" />
+                    <input required name="email" type="email" className="w-full bg-transparent border-b border-slate-600 focus:border-accent-terra focus:outline-none py-2 text-white transition-colors" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Target Mineral</label>
-                    <select className="w-full bg-transparent border-b border-slate-600 focus:border-accent-terra focus:outline-none py-2 text-slate-300 transition-colors appearance-none">
+                    <select name="mineral" className="w-full bg-transparent border-b border-slate-600 focus:border-accent-terra focus:outline-none py-2 text-slate-300 transition-colors appearance-none">
                       <option className="bg-[#111827]" value="silica">Silica Sand</option>
                       <option className="bg-[#111827]" value="alumina">Calcined Alumina</option>
                       <option className="bg-[#111827]" value="zircon">Zircon Sand</option>
@@ -183,14 +210,17 @@ export default function JapaneseMarketPage() {
                 
                 <div className="pt-4">
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Specification Requirements / inquiry Details</label>
-                  <textarea required rows={4} className="w-full bg-transparent border-b border-slate-600 focus:border-accent-terra focus:outline-none py-2 text-white transition-colors resize-none placeholder:text-slate-600" placeholder="Please list desired grading, purity thresholds, or delivery volumes..."></textarea>
+                  <textarea required name="requirements" rows={4} className="w-full bg-transparent border-b border-slate-600 focus:border-accent-terra focus:outline-none py-2 text-white transition-colors resize-none placeholder:text-slate-600" placeholder="Please list desired grading, purity thresholds, or delivery volumes..."></textarea>
                 </div>
 
                 <div className="pt-8 text-center">
-                  <button 
-                    type="submit" 
+                  {errorMsg && (
+                    <p className="text-red-400 text-sm mb-4">{errorMsg}</p>
+                  )}
+                  <button
+                    type="submit"
                     disabled={formStatus === "submitting"}
-                    className="bg-accent-terra hover:bg-[#A85F33] text-white px-12 py-3 rounded-sm font-medium tracking-wide transition-all min-w-[200px]"
+                    className="bg-accent-terra hover:bg-[#A85F33] text-white px-12 py-3 rounded-sm font-medium tracking-wide transition-all min-w-[200px] disabled:opacity-70 disabled:cursor-not-allowed"
                   >
                     {formStatus === "submitting" ? "Sending..." : "Submit Inquiry"}
                   </button>

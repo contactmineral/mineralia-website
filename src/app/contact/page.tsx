@@ -19,13 +19,39 @@ export default function ContactPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    
-    if (validateForm(formData)) {
-      setFormStatus("submitting");
-      setTimeout(() => setFormStatus("success"), 1500);
+
+    if (!validateForm(formData)) return;
+
+    setFormStatus("submitting");
+
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.get("name"),
+          company: formData.get("company"),
+          email: formData.get("email"),
+          phone: formData.get("phone"),
+          country: formData.get("country"),
+          mineral: formData.get("mineral"),
+          inquiryType: formData.get("inquiryType"),
+          message: formData.get("message"),
+        }),
+      });
+
+      if (res.ok) {
+        setFormStatus("success");
+      } else {
+        setFormStatus("idle");
+        setErrors({ form: "Failed to send your inquiry. Please try again." });
+      }
+    } catch {
+      setFormStatus("idle");
+      setErrors({ form: "Network error. Please check your connection and try again." });
     }
   };
 
@@ -132,11 +158,15 @@ export default function ContactPage() {
                     <button
                       type="submit"
                       disabled={formStatus === "submitting"}
-                      className="bg-accent-terra hover:bg-[#A85F33] text-white px-8 py-4 rounded-sm font-medium text-lg transition-colors w-full md:w-auto min-w-[250px] shadow-md"
+                      className="bg-accent-terra hover:bg-[#A85F33] text-white px-8 py-4 rounded-sm font-medium text-lg transition-colors w-full md:w-auto min-w-[250px] shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                       {formStatus === "submitting" ? "Submitting Request..." : "Submit Technical Inquiry"}
                     </button>
-                    
+
+                    {errors.form && (
+                      <p className="text-red-500 text-sm mt-2">{errors.form}</p>
+                    )}
+
                     <p className="text-xs text-slate-500 mt-4">
                       By submitting this form, you agree to our Privacy Policy regarding the handling of corporate information.
                     </p>
